@@ -32,8 +32,8 @@ from modality_credit.verifiers.exact_match import ExactMatchVerifier
 def main(n: int, K: int, budget_B: int, top_n_inner: int, seed: int, out_dir: Path):
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    samples = build_rotating_modality_dataset(n, K)
-    print(f"[1/4] Built {n} samples")
+    samples = build_rotating_modality_dataset(n, K, use_neutral_fillers=True)
+    print(f"[1/4] Built {n} samples (neutral fillers)")
 
     print(f"\n[2/4] Loading Qwen-2.5-VL-7B...")
     t0 = time.time()

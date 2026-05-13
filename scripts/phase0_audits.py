@@ -38,8 +38,8 @@ build_audit_dataset = build_rotating_modality_dataset
 def main(n: int, K: int, audit_filter: str, out_dir: Path):
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[1/4] Building Phase 0 dataset (n={n}, K={K}, rotating decisive modality)...")
-    samples = build_audit_dataset(n, K)
+    print(f"[1/4] Building Phase 0 dataset (n={n}, K={K}, rotating decisive modality, neutral_fillers=True)...")
+    samples = build_audit_dataset(n, K, use_neutral_fillers=True)
     for s in samples[:5]:
         print(f"      {s.instance_id}: decisive_mod={s.metadata['decisive_modality']}, gold={s.gold_answer!r}")
     if n > 5:
