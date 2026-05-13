@@ -15,43 +15,15 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from PIL import Image, ImageDraw, ImageFont
 
 from modality_credit.caching import CachedUtility
+from modality_credit.data.synthetic import render_text_image
 from modality_credit.estimator.owen import OwenEstimator
 from modality_credit.generators.qwen_vl import QwenVLGenerator
 from modality_credit.masking.redaction import RedactionMasker
 from modality_credit.types import MemoryItem, QueryInstance
 from modality_credit.utility import StandardUtility
 from modality_credit.verifiers.exact_match import ExactMatchVerifier
-
-
-def render_text_image(text: str, size: tuple[int, int] = (448, 224),
-                      bg_color="white", fg_color="black") -> Image.Image:
-    """Render a large readable text on a colored background."""
-    img = Image.new("RGB", size, bg_color)
-    draw = ImageDraw.Draw(img)
-    # Try a system font if available, else PIL default.
-    font = None
-    for path in [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    ]:
-        try:
-            font = ImageFont.truetype(path, size=42)
-            break
-        except OSError:
-            continue
-    if font is None:
-        font = ImageFont.load_default()
-    # Center the text
-    try:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    except AttributeError:
-        tw, th = draw.textsize(text, font=font)
-    draw.text(((size[0] - tw) / 2, (size[1] - th) / 2 - 4), text, fill=fg_color, font=font)
-    return img
 
 
 def build_sample(idx: int, K: int, decisive_k: int,

@@ -8,8 +8,38 @@ from __future__ import annotations
 import random
 from typing import Iterable
 
+from PIL import Image, ImageDraw, ImageFont
+
 from modality_credit.data.base import BaseDataset
 from modality_credit.types import MemoryItem, Modality, QueryInstance
+
+
+def render_text_image(text: str, size: tuple[int, int] = (448, 224),
+                      bg_color: str = "white", fg_color: str = "black",
+                      font_size: int = 42) -> Image.Image:
+    """Render text centered on a colored background. Used to inject decisive
+    facts into the 'vision' modality of synthetic samples."""
+    img = Image.new("RGB", size, bg_color)
+    draw = ImageDraw.Draw(img)
+    font = None
+    for path in [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]:
+        try:
+            font = ImageFont.truetype(path, size=font_size)
+            break
+        except OSError:
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+    try:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    except AttributeError:
+        tw, th = draw.textsize(text, font=font)
+    draw.text(((size[0] - tw) / 2, (size[1] - th) / 2 - 4), text, fill=fg_color, font=font)
+    return img
 
 
 class SyntheticDataset(BaseDataset):
