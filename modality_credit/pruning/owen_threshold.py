@@ -35,7 +35,9 @@ class OwenThresholdPruner(BasePruner):
                 kept += int(keep)
             modality_masks.append(mm)
 
-        context = self._masker.apply(query_inst.memory, item_mask, modality_masks)
+        context, _images = self._masker.apply(
+            query_inst.memory, item_mask, modality_masks,
+        )
         return PrunedContext(
             context_string=context,
             item_mask=item_mask,
