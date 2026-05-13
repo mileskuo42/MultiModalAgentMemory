@@ -25,11 +25,11 @@ def main():
     qi = ds[0]
     print(f"      instance_id={qi.instance_id}, query={qi.query!r}, gold={qi.gold_answer!r}")
 
-    print("\n[2/4] Loading Qwen-2.5-VL-7B on CPU (slow but unblocks driver mismatch)...")
+    print("\n[2/4] Loading Qwen-2.5-VL-7B on GPU (bf16)...")
     t0 = time.time()
     import torch
     gen = QwenVLGenerator(model_path="Qwen/Qwen2.5-VL-7B-Instruct",
-                          device="cpu", dtype=torch.bfloat16)
+                          device="cuda", dtype=torch.bfloat16)
     print(f"      loaded in {time.time()-t0:.1f}s; model.device={gen._model.device}")
 
     util = StandardUtility(gen, ExactMatchVerifier(lower=True, strip_punct=True), RedactionMasker())
