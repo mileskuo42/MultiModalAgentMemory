@@ -95,17 +95,38 @@ def main(n: int, K: int, budget_B: int, top_n_inner: int, seed: int, out_dir: Pa
     wall_total = time.time() - t_exp
 
     # ---- Phase 1 monitors
-    phi_stack = np.stack([np.array(r["phi"]) for r in rows])  # (n, K)
-    var_phi_emp = float(phi_stack.var(axis=0, ddof=1).mean())
-    var_phi_bound = (2 ** K) / (4 * budget_B)
-    var_ratio = var_phi_emp / var_phi_bound
-
     cons = np.array([r["conservation_residual"] for r in rows])
     item_acc = float(np.mean([r["top1_item_correct"] for r in rows]))
     mod_correct = [r["top1_mod_correct"] for r in rows if r["top1_mod_correct"] is not None]
     mod_acc = float(np.mean(mod_correct)) if mod_correct else float("nan")
     u_full_mean = float(np.mean([r["U_full"] for r in rows]))
     u_empty_mean = float(np.mean([r["U_empty"] for r in rows]))
+
+    # When U_full = 0, U(M)−U(∅) = 0, so Σφ = 0 → no signal to attribute.
+    # The framework's correctness is meaningful only on the U_full=1 subset
+    # (samples where the model could actually answer with full memory).
+    rows_with_signal = [r for r in rows if r["U_full"] == 1.0]
+    n_with_signal = len(rows_with_signal)
+    item_acc_signal = (float(np.mean([r["top1_item_correct"] for r in rows_with_signal]))
+                       if n_with_signal else float("nan"))
+    mod_correct_signal = [r["top1_mod_correct"] for r in rows_with_signal
+                          if r["top1_mod_correct"] is not None]
+    mod_acc_signal = (float(np.mean(mod_correct_signal))
+                      if mod_correct_signal else float("nan"))
+
+    # NOTE: the original 02_toy_pilot.py template computed
+    #   phi_stack.var(axis=0).mean()
+    # i.e., variance ACROSS HETEROGENEOUS SAMPLES. Prop 2's Var(φ̂) bound is
+    # about ESTIMATOR variance — i.e., variance across MC seeds for the SAME
+    # sample. The across-sample variance is dominated by signal (different
+    # true φ per sample), not estimator noise, so it is *not* a valid Prop 2
+    # check. Including it for backward-compat with the template, but the
+    # verdict no longer depends on it (see scripts/r10b_variance_metric_fix.py
+    # for a proper across-seed variance check; ratio is 0.089 << 1 there).
+    phi_stack = np.stack([np.array(r["phi"]) for r in rows])  # (n, K)
+    across_sample_var = float(phi_stack.var(axis=0, ddof=1).mean())
+    var_phi_bound = (2 ** K) / (4 * budget_B)
+    across_sample_var_ratio = across_sample_var / var_phi_bound
 
     # per-decisive-modality breakdown
     per_mod = {}
@@ -118,12 +139,18 @@ def main(n: int, K: int, budget_B: int, top_n_inner: int, seed: int, out_dir: Pa
             per_mod[m]["mod_correct"] += int(r["top1_mod_correct"])
 
     # ---- decision
-    if var_ratio > 3 or float(cons.mean()) > 0.10:
-        verdict = "FAIL — pivot to backup direction (CMA for write-policy)"
-    elif var_ratio > 1.5 or float(cons.mean()) > 0.05:
-        verdict = "WARN — bump N or check implementation; re-run before Phase 2"
+    # Verdict uses CONSERVATION + RECOVERY-ON-SIGNAL-SUBSET, not the
+    # heterogeneous-sample variance (see note above).
+    cons_mean = float(cons.mean())
+    if cons_mean > 0.10:
+        verdict = "FAIL — conservation > 10%; estimator implementation bug"
+    elif n_with_signal == 0:
+        verdict = "HALT — every sample had U_full=0; model can't answer at all (synthetic too hard?)"
+    elif cons_mean > 0.05 or item_acc_signal < 0.85:
+        verdict = (f"WARN — cons {cons_mean:.2%} or item-recovery-on-signal "
+                   f"{item_acc_signal:.0%}; investigate before Phase 2")
     else:
-        verdict = "PASS — proceed to Phase 2"
+        verdict = f"PASS — conservation {cons_mean:.2%}, item recovery {item_acc_signal:.0%} on {n_with_signal}/{n} signal samples"
 
     summary = {
         "n_samples": n,
@@ -132,13 +159,16 @@ def main(n: int, K: int, budget_B: int, top_n_inner: int, seed: int, out_dir: Pa
         "top_n_inner": top_n_inner,
         "u_full_mean": u_full_mean,
         "u_empty_mean": u_empty_mean,
-        "var_phi_empirical": var_phi_emp,
-        "var_phi_bound": var_phi_bound,
-        "var_ratio": var_ratio,
         "conservation_residual_mean": float(cons.mean()),
         "conservation_residual_max": float(cons.max()),
-        "top1_item_recovery": item_acc,
-        "top1_mod_recovery_conditional": mod_acc,
+        "top1_item_recovery_all": item_acc,
+        "top1_mod_recovery_all_conditional": mod_acc,
+        "n_with_signal_u_full_eq_1": n_with_signal,
+        "top1_item_recovery_signal_only": item_acc_signal,
+        "top1_mod_recovery_signal_only": mod_acc_signal,
+        "across_sample_var_NOT_prop2": across_sample_var,
+        "across_sample_var_ratio_NOT_prop2": across_sample_var_ratio,
+        "across_seed_var_bound_2K_over_4N": var_phi_bound,
         "wall_clock_total_sec": wall_total,
         "wall_clock_per_sample_sec": wall_total / max(n, 1),
         "per_decisive_modality": per_mod,
