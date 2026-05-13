@@ -1,0 +1,43 @@
+# Environments
+.venv/
+venv/
+env/
+.python-version
+
+# Build / packaging
+*.egg-info/
+build/
+dist/
+*.egg
+
+# Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Experiment artifacts (results/ is for run outputs, not source)
+results/
+wandb/
+*.pkl
+*.npz
+*.pt
+*.safetensors
+
+# Vendor submodules (will be added via `git submodule` later)
+vendor/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store

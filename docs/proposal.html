@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Owen-Value Attribution for Multimodal Agent Memory</title>
+
+<!-- MathJax for proper LaTeX math rendering -->
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['\\(', '\\)']],
+    displayMath: [['\\[', '\\]']],
+    processEscapes: true,
+    tags: 'none'
+  },
+  chtml: { scale: 1.0 },
+  svg: { fontCache: 'global' }
+};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+<style>
+/* ============================================================
+   Claude design system (from voltagent/awesome-design-md)
+   Cream canvas + warm coral + dark navy + serif display
+   ============================================================ */
+:root {
+  --primary: #cc785c;
+  --primary-active: #a9583e;
+  --primary-disabled: #e6dfd8;
+  --ink: #141413;
+  --body: #3d3d3a;
+  --body-strong: #252523;
+  --muted: #6c6a64;
+  --muted-soft: #8e8b82;
+  --hairline: #e6dfd8;
+  --hairline-soft: #ebe6df;
+  --canvas: #faf9f5;
+  --surface-soft: #f5f0e8;
+  --surface-card: #efe9de;
+  --surface-cream-strong: #e8e0d2;
+  --surface-dark: #181715;
+  --surface-dark-elevated: #252320;
+  --on-primary: #ffffff;
+  --on-dark: #faf9f5;
+  --on-dark-soft: #a09d96;
+  --accent-teal: #5db8a6;
+  --accent-amber: #e8a55a;
+  --success: #5db872;
+  --warning: #d4a017;
+  --error: #c64545;
+
+  --serif: "Copernicus", "Tiempos Headline", "Source Serif Pro", Georgia, serif;
+  --sans: "StyreneB", "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --cjk: "PingFang SC", "Hiragino Sans GB", "Source Han Sans CN", "Noto Sans CJK SC", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: var(--canvas);
+  color: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Layout */
+.page { max-width: 880px; margin: 0 auto; padding: 64px 32px 96px; }
+@media (max-width: 640px) { .page { padding: 32px 20px 64px; } }
+
+/* Hero */
+.hero { border-bottom: 1px solid var(--hairline); padding-bottom: 48px; margin-bottom: 64px; }
+.eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 32px;
+  height: 1px;
+  background: var(--primary);
+}
+.hero h1 {
+  font-family: var(--serif);
+  font-size: 56px;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -1.2px;
+  color: var(--ink);
+  margin: 0 0 16px 0;
+}
+.hero h1 .cn { font-family: var(--cjk); font-size: 36px; display: block; margin-top: 8px; color: var(--body-strong); letter-spacing: 0; }
+@media (max-width: 640px) { .hero h1 { font-size: 36px; } .hero h1 .cn { font-size: 24px; } }
+.hero .lede { font-size: 18px; color: var(--muted); margin-top: 24px; max-width: 640px; }
+.hero .meta {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hairline-soft);
+  font-size: 13px;
+  color: var(--muted);
+}
+.hero .meta strong { color: var(--body-strong); font-weight: 500; }
+
+/* TOC */
+.toc {
+  background: var(--surface-soft);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 64px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 640px) { .toc { grid-template-columns: 1fr; } }
+.toc a {
+  text-decoration: none;
+  color: var(--ink);
+  padding: 16px;
+  background: var(--canvas);
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  transition: all 0.15s ease;
+  display: block;
+}
+.toc a:hover { border-color: var(--primary); transform: translateY(-1px); }
+.toc .num {
+  font-family: var(--serif);
+  font-size: 28px;
+  color: var(--primary);
+  display: block;
+  margin-bottom: 4px;
+}
+.toc .label-en { font-weight: 500; display: block; font-size: 15px; }
+.toc .label-cn { font-family: var(--cjk); color: var(--muted); font-size: 13px; }
+
+/* Sections */
+section { margin-bottom: 80px; }
+section > .section-header {
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--ink);
+}
+.section-header .roman {
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--primary);
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+.section-header h2 {
+  font-family: var(--serif);
+  font-size: 40px;
+  font-weight: 400;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+.section-header h2 .cn { font-family: var(--cjk); font-size: 24px; display: block; margin-top: 8px; color: var(--body-strong); }
+
+/* Headings */
+h3 {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 48px 0 16px 0;
+  letter-spacing: -0.3px;
+}
+h3 .cn { font-family: var(--cjk); font-size: 18px; color: var(--muted); margin-left: 12px; font-weight: 400; }
+h4 {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--body-strong);
+  margin: 32px 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* Language pair */
+.bilingual { margin: 24px 0; }
+.bilingual .cn-block,
+.bilingual .en-block {
+  position: relative;
+  padding-left: 56px;
+}
+.bilingual .cn-block { font-family: var(--cjk); margin-bottom: 20px; color: var(--body-strong); }
+.bilingual .en-block { color: var(--body); margin-bottom: 20px; }
+.bilingual .cn-block::before,
+.bilingual .en-block::before {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.bilingual .cn-block::before { content: "中文"; background: var(--surface-card); color: var(--primary-active); }
+.bilingual .en-block::before { content: "EN"; background: var(--ink); color: var(--on-dark); }
+
+/* Paragraphs */
+p { margin: 16px 0; }
+strong { color: var(--body-strong); font-weight: 600; }
+
+/* Code & math */
+code {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--surface-card);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--body-strong);
+}
+pre {
+  background: var(--surface-dark);
+  color: var(--on-dark);
+  padding: 20px 24px;
+  border-radius: 12px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 24px 0;
+}
+pre code { background: transparent; padding: 0; color: var(--on-dark); }
+
+.math {
+  background: var(--surface-soft);
+  border-left: 3px solid var(--primary);
+  padding: 20px 28px;
+  border-radius: 0 8px 8px 0;
+  margin: 24px 0;
+  overflow-x: auto;
+  font-size: 15px;
+  color: var(--ink);
+}
+.math mjx-container { margin: 0.5em 0; }
+.math .math-label {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: var(--primary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+mjx-container[jax="SVG"][display="true"] {
+  margin: 0.5em 0 !important;
+  text-align: left !important;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 24px 0;
+  font-size: 14px;
+}
+th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--ink);
+}
+td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+table code { font-size: 12px; }
+
+/* Callout cards */
+.card {
+  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin: 24px 0;
+  border: 1px solid var(--hairline);
+}
+.card.dark {
+  background: var(--surface-dark);
+  color: var(--on-dark);
+  border: none;
+}
+.card.dark p, .card.dark li { color: var(--on-dark-soft); }
+.card.dark strong { color: var(--on-dark); }
+.card .label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+.card.dark .label { color: var(--accent-amber); }
+
+.contribution-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 32px 0;
+}
+@media (max-width: 640px) { .contribution-grid { grid-template-columns: 1fr; } }
+.contribution-card {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 24px;
+  position: relative;
+}
+.contribution-card .num {
+  font-family: var(--serif);
+  font-size: 32px;
+  color: var(--primary);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.contribution-card h4 {
+  margin: 0 0 8px 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.contribution-card p { font-size: 14px; margin: 0; color: var(--muted); }
+
+/* Diagram */
+.diagram {
+  background: var(--surface-dark);
+  color: var(--on-dark);
+  padding: 28px 32px;
+  border-radius: 12px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  margin: 32px 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Inline badge */
+.badge {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: var(--on-primary);
+  vertical-align: middle;
+  margin-left: 8px;
+}
+.badge.teal { background: var(--accent-teal); }
+.badge.amber { background: var(--accent-amber); color: var(--ink); }
+.badge.muted { background: var(--surface-card); color: var(--body-strong); }
+.badge.success { background: var(--success); }
+.badge.warn { background: var(--warning); color: var(--ink); }
+
+/* Lists */
+ul, ol { padding-left: 24px; margin: 16px 0; }
+li { margin: 6px 0; }
+.cjk-list li { font-family: var(--cjk); color: var(--body-strong); }
+
+/* Footer */
+footer {
+  margin-top: 96px;
+  padding-top: 32px;
+  border-top: 1px solid var(--hairline);
+  font-size: 13px;
+  color: var(--muted);
+}
+footer a { color: var(--primary); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+/* Pull quote */
+.pullquote {
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--ink);
+  padding: 24px 0 24px 32px;
+  border-left: 4px solid var(--primary);
+  margin: 32px 0;
+  letter-spacing: -0.2px;
+}
+.pullquote .cn { display: block; font-family: var(--cjk); font-size: 16px; color: var(--muted); margin-top: 12px; }
+
+/* Step indicators */
+.phase {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  margin: 28px 0;
+  padding: 24px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+}
+.phase .phase-num {
+  font-family: var(--serif);
+  font-size: 48px;
+  line-height: 1;
+  color: var(--primary);
+}
+.phase h4 { margin: 0 0 8px 0; text-transform: none; letter-spacing: 0; font-size: 18px; }
+.phase .phase-date { font-size: 12px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+
+.divider { border: none; border-top: 1px solid var(--hairline); margin: 64px 0; }
+</style>
+</head>
+
+<body>
+<div class="page">
+
+<!-- ============================================ HERO ============================================ -->
+<header class="hero">
+  <div class="eyebrow">Research Proposal · 2026-05-12</div>
+  <h1>Owen-Value Attribution for Multimodal Agent Memory<span class="cn">多模态 Agent Memory 的 Owen 值归因</span></h1>
+  <p class="lede">First application of Owen value (1977) to memory-equipped multimodal agents — yielding a closed-form sample-allocation policy and attribution-driven modality-pruned retrieval at ≥10pp accuracy lift.</p>
+  <div class="meta">
+    <span><strong>Advisor sync</strong> · 2026-05-18</span>
+    <span><strong>Target venue</strong> · NeurIPS 2026 D&B / CVPR 2026 / ICLR 2027</span>
+    <span><strong>Compute</strong> · ≈ 20 GPU-h (Phase 1–4)</span>
+    <span><strong>Status</strong> · pre-experiment, novelty-cleared</span>
+  </div>
+</header>
+
+<!-- ============================================ TOC ============================================ -->
+<nav class="toc">
+  <a href="#brief">
+    <span class="num">I</span>
+    <span class="label-en">Brief</span>
+    <span class="label-cn">简短报告：做什么 · 怎么做</span>
+  </a>
+  <a href="#theory">
+    <span class="num">II</span>
+    <span class="label-en">Theory</span>
+    <span class="label-cn">理论：Owen 值 + 方差界 + 采样策略</span>
+  </a>
+  <a href="#experiments">
+    <span class="num">III</span>
+    <span class="label-en">Experiments</span>
+    <span class="label-cn">实验：四阶段、双轨实证</span>
+  </a>
+</nav>
+
+<!-- ============================================ I. BRIEF ============================================ -->
+<section id="brief">
+  <div class="section-header">
+    <div class="roman">PART I</div>
+    <h2>Brief — What & How<span class="cn">简短报告：要做的事 与 怎么做</span></h2>
+  </div>
+
+  <h3>1.1 What we are building <span class="cn">要做什么</span></h3>
+
+  <div class="bilingual">
+    <div class="cn-block">2025–2026 涌现了一批 memory-equipped multimodal agent（M3-Agent、WorldMM、MMA、MemVerse），让 agent 在长期交互中持续看视频、听音频、读对话，并把这些观察以 episode 形式写进 long-term memory。当用户提问时，agent 从 memory 里 retrieve K 条相关 episode，喂给 base VLM 生成答案。每条 episode 本身是多模 composition：视频帧 + caption + 音频转录 + scene metadata。</div>
+    <div class="en-block">A new generation of memory-equipped multimodal agents (M3-Agent, WorldMM, MMA, MemVerse) continuously observe video, audio, and dialogue, writing those observations as episodes into long-term memory. At query time, the agent retrieves K relevant episodes and feeds them to a base VLM. Each episode is itself a multimodal composition: vision frames + caption + audio transcript + scene metadata.</div>
+  </div>
+
+  <div class="bilingual">
+    <div class="cn-block">当 agent 答错时，开发者想知道：<strong>是哪条 memory 里的哪种 modality 出了问题</strong>——是视频帧没看清？字幕写错了？还是音频转录出现了 hallucination？这三种失败模式需要完全不同的修复策略，但目前所有归因工具要么把整条 episode 当 atomic player（per-document Shapley），要么只在 single-shot classification 上做 flat per-modality 归因。没有人在 memory-equipped multimodal agent 上做过 (memory item × modality) 两层归因。</div>
+    <div class="en-block">When such an agent answers incorrectly, developers need to know <strong>which memory item × which modality is responsible</strong> — a blurry frame, a mis-transcribed caption, an audio hallucination? Each failure mode demands a different fix. Yet existing attribution tools either treat each episode as an atomic player (per-document Shapley) or perform flat per-modality attribution on single-shot classification. No prior work performs joint <em>(memory item × modality)</em> two-level attribution on memory-equipped multimodal agents.</div>
+  </div>
+
+  <div class="pullquote">
+    We bring <strong>Owen value (1977)</strong> — the classical hierarchical Shapley for grouped players — to the memory layer of multimodal agents, for the first time.
+    <span class="cn">第一次把 Owen value 这一经典 cooperative game theory 工具落到 multimodal memory-equipped agent 的归因问题上。</span>
+  </div>
+
+  <h3>1.2 Three contributions <span class="cn">三层贡献</span></h3>
+
+  <div class="contribution-grid">
+    <div class="contribution-card">
+      <div class="num">01</div>
+      <h4>Application novelty</h4>
+      <p>First application of Owen value to multimodal memory-equipped agents. Deep novelty check (2026-05-11) confirms the four-way intersection — Owen × multimodal × memory agent × inference-time — is empty.</p>
+    </div>
+    <div class="contribution-card">
+      <div class="num">02</div>
+      <h4>Closed-form allocation</h4>
+      <p>Derive \(N_\text{out}^{*} \propto \sqrt{2^K}\) and \(N_\text{in}^{(k)\,*} \propto \sqrt{2^{L_k}}\) from the variance ratio bound. Given budget \(B\), the optimal split is closed-form — no hyperparameter tuning.</p>
+    </div>
+    <div class="contribution-card">
+      <div class="num">03</div>
+      <h4>Modality-pruned retrieval</h4>
+      <p>Attribution-driven eviction \(\tilde M(Q) = \{\, v_k^{(\ell)} : \phi_k > \tau_1 \,\wedge\, \psi_{k,\ell} > \tau_2 \,\}\). Target \(\ge 10\) pp \(\Delta\)Acc at \(\le 40\%\) context retention.</p>
+    </div>
+  </div>
+
+  <h3>1.3 How — Method at a glance <span class="cn">方法一览</span></h3>
+
+  <div class="diagram">Query Q
+   ↓
+M3-Agent retrieval (frozen)  →  M(Q) = {m_1, ..., m_K},  m_k = (v_k^vision, v_k^text, v_k^audio)
+   ↓
+┌──────────────────────────────────────────────────────────────────────┐
+│  Owen-Value Estimator  [NEW · inference-time · 0 training]           │
+│    ├ Outer game:  Kernel SHAP over K items       →  {φ_k}            │
+│    ├ Inner game:  MC permutation over L_k modalities (top-N=2 items) │
+│    │              conditional on M_{¬k}          →  {ψ_{k,ℓ}}        │
+│    └ Sample budget split by Alg. 1 (closed-form allocation)          │
+└──────────────────────────────────────────────────────────────────────┘
+   ↓
+Generator p_θ(y | Q, M)  (frozen, Qwen-2.5-VL-7B)
+   ↓
+┌──────────────────────────────────────────────────────────────────────┐
+│  Modality-Pruned Retrieval  [NEW · must-accept empirical hook]       │
+│    M̃(Q) = { v_k^(ℓ) : φ_k &gt; τ_1  ∧  ψ_{k,ℓ} &gt; τ_2 }                │
+└──────────────────────────────────────────────────────────────────────┘
+   ↓
+Final answer y</div>
+
+  <div class="bilingual">
+    <div class="cn-block">实现成本：~200 LoC patch 到 <code>m3_agent/retrieval.py</code>，0 training，frozen base model + frozen retrieval。M3-Agent 的 memory 本身是 entity-centric multimodal graph（每个 entity 下挂 modality sub-node），(item × modality) 两层结构是已有数据结构，<strong>我们不是 patch 一个 hierarchy 进去，是激活已有的</strong>。</div>
+    <div class="en-block">Implementation cost: ~200 LoC patch on <code>m3_agent/retrieval.py</code>; no training; frozen base model and frozen retrieval. M3-Agent's memory is already an entity-centric multimodal graph with modality sub-nodes — the two-level structure is the native data structure, <strong>not a hierarchy we impose</strong>.</div>
+  </div>
+
+  <h3>1.4 Why this setting fits Owen value <span class="cn">为什么这个 setting 对 Owen 值特别合适</span></h3>
+
+  <div class="bilingual">
+    <div class="cn-block">Shapley 与 Owen value 要求 <strong>permutation invariance</strong>——必须能对任意子集评估 u(S)。RL credit (如 OSPO) 受困于 trajectory 的因果时序，无法 freely mask 中间 action。但 <strong>retrieval 把 agent 的动态因果流切成了静态 snapshot 集合</strong>——K 条 retrieved item 在 generator context 里并行 attend，可以自由 mask 任意子集。memory 的真正时序在 write-time，那一层确实 attribution-hostile——我们主动切割那层，留给 backup direction (Cross-Modal Causal Mediation for Write-Policy) 处理。</div>
+    <div class="en-block">Shapley/Owen require <strong>permutation invariance</strong>: u(S) must be defined for any subset S. RL credit (e.g., OSPO) is constrained by trajectory causality — you cannot freely mask an interior action. <strong>Retrieval, however, turns a dynamic causal stream into a static snapshot set</strong>: the K retrieved items attend in parallel and any subset can be masked. The genuine temporal structure lives in <em>write-time</em> consolidation; we deliberately scope it out as a non-goal and reserve it for the backup direction (Cross-Modal Causal Mediation for Write-Policy).</div>
+  </div>
+
+  <h3>1.5 Roadmap <span class="cn">总体路线</span></h3>
+
+  <table>
+    <thead>
+      <tr><th>Phase</th><th>Dates</th><th>Goal</th><th>Decision point</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>0</td><td>5/13</td><td>Implement estimator (~200 LoC) on M3-Agent</td><td>—</td></tr>
+      <tr><td>1</td><td>5/14</td><td>Toy pilot (30 QA), variance & conservation check</td><td><span class="badge warn">Go / pivot</span></td></tr>
+      <tr><td>2</td><td>5/15</td><td>Detection (Claim 1) + theory validation (1.5, 1.6)</td><td>Theory holds</td></tr>
+      <tr><td>3</td><td>5/16</td><td>Modality-pruned retrieval + cross-architecture</td><td><span class="badge">Venue tier</span></td></tr>
+      <tr><td>4</td><td>5/19–6/03</td><td>Hardening pack (poisoning, scale, lower bound, taxonomy, human study)</td><td>Top-venue push</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<hr class="divider">
+
+<!-- ============================================ II. THEORY ============================================ -->
+<section id="theory">
+  <div class="section-header">
+    <div class="roman">PART II</div>
+    <h2>Theory — Owen Value, Variance, Allocation<span class="cn">理论：Owen 值 · 方差界 · 采样配置</span></h2>
+  </div>
+
+  <h3>2.1 Background: Owen value (1977) <span class="cn">背景：Owen 值</span></h3>
+
+  <div class="bilingual">
+    <div class="cn-block">Owen value 是 cooperative game theory 中处理 "玩家有先验分组（a priori union）" 情境的经典扩展。把玩家 N 划分为 coalitions {P_1, ..., P_K}：先在 P_k 之间计算 between-group Shapley（φ_k），再在每个 P_k 内部计算 within-group Shapley（ψ_{k,ℓ}）。Kamijo (2009) 给出了等价的 "Two-Step Shapley" 表述。</div>
+    <div class="en-block">Owen value (Owen 1977) is the classical Shapley extension for games whose players have an <em>a priori</em> coalition structure. Partition the player set N into coalitions {P_1, ..., P_K}: compute a between-group Shapley value φ<sub>k</sub> first, then for each P<sub>k</sub> compute a within-group Shapley value ψ<sub>k,ℓ</sub>. Kamijo (2009) gives the equivalent "Two-Step Shapley" formulation.</div>
+  </div>
+
+  <div class="math">
+    <span class="math-label">Conservation (Owen Efficiency)</span>
+    \[
+    \begin{aligned}
+    \text{between-group:}\quad & \sum_{k=1}^{K} \phi_k \;=\; U(M) - U(\emptyset) \\[4pt]
+    \text{within-group:}\quad & \sum_{\ell=1}^{L_k} \psi_{k,\ell} \;=\; \phi_k \qquad \forall\, k
+    \end{aligned}
+    \]
+  </div>
+
+  <div class="card">
+    <div class="label">Honest framing</div>
+    <p>Owen value is classical. We do not claim a new theorem on hierarchical Shapley axioms. The novelty lies in (a) applying it to multimodal memory agents for the first time, (b) deriving a closed-form sample-allocation policy from its variance ratio bound, and (c) using it to power modality-pruned retrieval.</p>
+  </div>
+
+  <h3>2.2 Our setup <span class="cn">我们的 setup</span></h3>
+
+  <div class="math">
+    <span class="math-label">Player set (query-conditioned)</span>
+    \[
+    M(Q) \;=\; \{\, m_1, \ldots, m_K \,\}, \qquad m_k \;=\; \bigl( v_k^{(1)}, \ldots, v_k^{(L_k)} \bigr)
+    \]
+    <span class="math-label" style="margin-top:8px">Utility function</span>
+    \[
+    u(y, y^*) \;=\; \mathbf{1}[y = y^*] \;\in\; \{0, 1\}, \qquad
+    U(S) \;=\; \mathbb{E}_y\!\bigl[\, u(y, y^*) \,\big|\, Q, S \,\bigr] \;\in\; [0, 1]
+    \]
+    <span class="math-label" style="margin-top:8px">Two games</span>
+    \[
+    \begin{aligned}
+    G_\text{out}: \quad & \text{players} = \{m_1, \ldots, m_K\}, \quad \text{utility} = U \\
+    G_\text{in}^{(k)}: \quad & \text{players} = \text{modalities of } m_k, \quad \text{utility} = U(\,\cdot\,\mid M_{\neg k} \text{ frozen})
+    \end{aligned}
+    \]
+  </div>
+
+  <h3>2.3 Proposition 2 — Finite-sample variance <span class="cn">命题 2：有限样本方差</span></h3>
+
+  <div class="bilingual">
+    <div class="cn-block">对每层 Monte Carlo 估计器，使用 N 个采样：方差被 sub-coalition lattice 大小线性 bound 住。Utility u ∈ {0,1} 给出 McDiarmid bounded-difference 常数为 1，σ²_max ≤ 1/4。</div>
+    <div class="en-block">For the Monte Carlo estimator at each level with N samples, the variance is linearly bounded by the sub-coalition lattice size. Since u ∈ {0,1}, the McDiarmid bounded-difference constant is 1 and σ²<sub>max</sub> ≤ 1/4.</div>
+  </div>
+
+  <div class="math">
+    <span class="math-label">(2a) Variance bound</span>
+    \[
+    \operatorname{Var}(\hat\phi_k) \;\le\; \frac{2^K}{4N}, \qquad
+    \operatorname{Var}(\hat\psi_{k,\ell}) \;\le\; \frac{2^{L_k}}{4N}
+    \]
+    <span class="math-label" style="margin-top:8px">(2b) McDiarmid concentration</span>
+    \[
+    \mathbb{P}\!\Bigl( \bigl| \hat\phi_k - \phi_k \bigr| > \varepsilon \Bigr) \;\le\; 2 \exp\!\Bigl( - \frac{2 N \varepsilon^2}{2^K} \Bigr)
+    \]
+    <span class="math-label" style="margin-top:8px">(2c) Variance ratio vs flat token Shapley</span>
+    \[
+    \frac{\operatorname{Var}(\text{hierarchical})}{\operatorname{Var}(\text{flat})} \;\le\; \frac{\sum_{k=1}^{K} 2^{L_k}}{2^{\sum_{k=1}^{K} L_k}}
+    \]
+  </div>
+
+  <h3>2.4 Algorithm 1 — Closed-form allocation <span class="cn">算法 1：闭式采样配置</span></h3>
+
+  <div class="bilingual">
+    <div class="cn-block">这是 v2 相对原 plan 的新贡献。给定总预算 B = K · N_outer + Σ_k N_inner^(k)，对 (2a) 的 variance 求和并施加预算约束，用拉格朗日乘子法解最优配置：</div>
+    <div class="en-block">This is the new algorithmic contribution beyond Owen 1977. Given a total query budget B = K · N<sub>outer</sub> + Σ<sub>k</sub> N<sub>inner</sub><sup>(k)</sup>, minimise the total Var via Lagrangian optimisation:</div>
+  </div>
+
+  <div class="math">
+    <span class="math-label">Lagrangian objective</span>
+    \[
+    \min_{N_\text{out},\, \{N_\text{in}^{(k)}\}}\;\; \frac{2^K}{N_\text{out}} \;+\; \sum_{k=1}^{K} \frac{2^{L_k}}{N_\text{in}^{(k)}}
+    \quad\text{s.t.}\quad
+    K \cdot N_\text{out} \;+\; \sum_{k=1}^{K} N_\text{in}^{(k)} \;=\; B
+    \]
+    <span class="math-label" style="margin-top:8px">Closed-form optimal allocation</span>
+    \[
+    N_\text{out}^{*} \;\propto\; \sqrt{2^K}, \qquad
+    N_\text{in}^{(k)\,*} \;\propto\; \sqrt{2^{L_k}}
+    \]
+    <span class="math-label" style="margin-top:8px">Practitioner interface</span>
+    \[
+    \bigl(K,\; \{L_k\},\; B\bigr) \;\;\longmapsto\;\; \bigl(N_\text{out}^{*},\; \{N_\text{in}^{(k)\,*}\}\bigr)
+    \]
+  </div>
+
+  <h4>Sample complexity wedge<span class="cn"> 采样复杂度差距</span></h4>
+
+  <table>
+    <thead>
+      <tr><th>K</th><th>L<sub>k</sub></th><th>Flat token Shapley</th><th>Hierarchical (Alg. 1)</th><th>Reduction</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>2</td><td>2</td><td>\(2^{4} = 16\)</td><td>12</td><td>1.3×</td></tr>
+      <tr><td>4</td><td>4</td><td>\(2^{16} = 65{,}536\)</td><td>80</td><td><strong>819×</strong></td></tr>
+      <tr><td>4</td><td>6</td><td>\(2^{24} \approx 1.7{\times}10^{7}\)</td><td>272</td><td><strong>61,679×</strong></td></tr>
+      <tr><td>8</td><td>6</td><td>\(2^{48} \approx 2.8{\times}10^{14}\)</td><td>≈ 580</td><td><strong>\(\approx 5{\times}10^{11}\)×</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.5 Appendix A — Owen value derivations <span class="cn">附录 A：Owen 值的直接推论（移出主文）</span></h3>
+
+  <div class="bilingual">
+    <div class="cn-block">为避免把经典结果包装成新理论：以下两条都是 Owen 1977 / Kamijo 2009 的直接推论，在 paper 里放在 Appendix A，main text 只引用。</div>
+    <div class="en-block">To avoid overselling classical results: the two propositions below are direct corollaries of Owen 1977 / Kamijo 2009. We place them in Appendix A and only reference them from the main text.</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Prop</th><th>Statement</th><th>Source</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>A.1</td><td>Conservation at each level (Σ φ<sub>k</sub> = U(M) − U(∅);  Σ ψ<sub>k,ℓ</sub> = φ<sub>k</sub>)</td><td>Owen 1977 Efficiency axiom</td></tr>
+      <tr><td>A.2</td><td>Uniqueness on hierarchical lattice (Efficiency-per-level + Symmetry + Linearity + Null-player)</td><td>Owen 1977 characterization theorem</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.6 Phase 4 theory upgrade — matching lower bound <span class="cn">Phase 4 理论加强：匹配下界</span></h3>
+
+  <div class="bilingual">
+    <div class="cn-block">为把 Prop 2 从 "我们有一个 upper bound" 升级为 "我们有 the bound"，Phase 4 计划补一个 information-theoretic lower bound：任何 unbiased estimator 在 hierarchical regime 都不能比 Ω(2^K/N + Σ 2^{L_k}/N) 更好。技术路径借鉴 Mann-Wright (1991) 经典 Shapley estimator lower bound，把 single-coalition 推广到 nested coalition。</div>
+    <div class="en-block">To upgrade Prop 2 from "we have <em>a</em> bound" to "we have <em>the</em> bound", Phase 4 adds an information-theoretic lower bound: any unbiased estimator in the hierarchical regime must satisfy Var ≥ Ω(2<sup>K</sup>/N + Σ 2<sup>L_k</sup>/N). We follow Mann–Wright (1991) for the single-coalition argument and extend to nested coalitions.</div>
+  </div>
+
+  <h3>2.7 What we deliberately do NOT claim <span class="cn">明确不卖的几件事</span></h3>
+
+  <ul class="cjk-list">
+    <li>不卖 "two-level Shapley factorization" 为新数学结构（= Owen 1977）</li>
+    <li>不卖 Conservation 为新定理（= Owen Efficiency axiom）</li>
+    <li>不卖 Uniqueness on hierarchical lattice 为新结果（= Owen characterization）</li>
+    <li>新声明只有：(a) 应用 novelty, (b) closed-form allocation, (c) modality-pruned retrieval 实证</li>
+  </ul>
+</section>
+
+<hr class="divider">
+
+<!-- ============================================ III. EXPERIMENTS ============================================ -->
+<section id="experiments">
+  <div class="section-header">
+    <div class="roman">PART III</div>
+    <h2>Experiments — Four Phases, Two Tracks<span class="cn">实验：四阶段、双轨实证</span></h2>
+  </div>
+
+  <div class="bilingual">
+    <div class="cn-block">主线（Phase 1–3）保证 paper 能写出来；hardening pack（Phase 4）把 top-venue 落点从 ~25% 推到 ~65–70%。整体预算 ≈ 20 GPU-h，分布到 ~3 周。</div>
+    <div class="en-block">Main track (Phase 1–3) secures a publishable paper; the hardening pack (Phase 4) lifts the top-venue probability from ~25% to ~65–70%. Total budget ≈ 20 GPU-h spread over ~3 weeks.</div>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div class="phase">
+    <div class="phase-num">1</div>
+    <div>
+      <div class="phase-date">5/14 · 0.5 GPU-h · Decisive go/no-go</div>
+      <h4>Toy Pilot — Variance & Conservation Sanity</h4>
+      <p><strong>Setup.</strong> 30 QA from M3-Bench, K = 4, L<sub>k</sub> ∈ {3, 4}. Sampling budget B = 500 split by Alg. 1 (N<sub>outer</sub> ≈ 94, N<sub>inner</sub> ≈ 51 per item).</p>
+      <p><strong>Three monitors.</strong></p>
+      <table>
+        <thead><tr><th>Indicator</th><th>Pass</th><th>Warn</th><th>Fail → pivot</th></tr></thead>
+        <tbody>
+          <tr><td>\(\operatorname{Var}(\hat\phi_k)\) vs bound \(2^K/(4N)\)</td><td>≤ 1.3×</td><td>1.3–2×</td><td>&gt; 3×</td></tr>
+          <tr><td>Conservation residual</td><td>&lt; 5%</td><td>5–10%</td><td>&gt; 10%</td></tr>
+          <tr><td>\(\hat\psi_{k,\ell}\) Spearman across 5 seeds</td><td>&gt; 0.85</td><td>0.7–0.85</td><td>&lt; 0.7</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Decision.</strong> Any FAIL → trigger backup pivot to Cross-Modal Causal Mediation for Write-Policy. Otherwise proceed to Phase 2.</p>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase">
+    <div class="phase-num">2</div>
+    <div>
+      <div class="phase-date">5/15 · 2.2 GPU-h · Detection + theory validation</div>
+      <h4>Full Detection + Theory Triangulation</h4>
+      <p><strong>Claim 1 — Detection (100 QA).</strong> Compute \((\phi, \psi)\) for all 100 QA; prune top vs bottom quartile; target \(\Delta\)Acc \(\ge\) <strong>15 pp</strong>. Baselines: (B1) flat token Shapley, (B2) item-only Shapley, (B3) attention rollout, (B4) LLM self-report.</p>
+      <p><strong>Claim 1.1 — KSHAP seeding ablation.</strong> Spearman correlation between seeded and uniform KSHAP \(> 0.9\) (sanity check, no extra cost).</p>
+      <p><strong>Claim 1.5 — Synthetic scaling.</strong> Synthetic generator with injected ground-truth modality importance; grid \(K \in \{2,4,6,8\} \times L_k \in \{1,2,4,6\}\). Target: (i) GT top-decile recovery \(\ge 80\%\); (ii) empirical variance ratio matches Corollary 2c within \(\pm 20\%\); (iii) empirical \(N_\text{out}/N_\text{in}\) ratio matches Alg. 1 prediction within \(\pm 30\%\).</p>
+      <p><strong>Claim 1.6 — Real-data LOO variance.</strong> 30 QA \(\times\) \(N \in \{50, 100, 200\}\) \(\times\) 5 seeds. Empirical \(\operatorname{Var}(\hat\phi)\) vs \(1/N\) must match theory within \(\pm 30\%\).</p>
+    </div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase">
+    <div class="phase-num">3</div>
+    <div>
+      <div class="phase-date">5/16 · 4.5 GPU-h · Empirical hook + generalization</div>
+      <h4>Modality-Pruned Retrieval + Cross-Architecture</h4>
+      <p><strong>Claim 2 — Modality-pruned retrieval. <span class="badge">Must-accept hook</span></strong></p>
+      <p>M3-Bench 100 QA, thresholds \((\tau_1, \tau_2) \in \{(.05,.05), (.1,.1), (.2,.2)\}\). Baselines: (a) random modality-drop at matched compression, (b) item-only pruning, (c) full retrieval.</p>
+      <table>
+        <thead><tr><th>Δ Acc at 40% retention</th><th>Outcome</th><th>Venue path</th></tr></thead>
+        <tbody>
+          <tr><td>≥ 10pp</td><td>Hook tight</td><td>NeurIPS D&B / CVPR full paper</td></tr>
+          <tr><td>5–10pp</td><td>Moderate</td><td>ICLR / EMNLP short</td></tr>
+          <tr><td>&lt; 5pp</td><td>Demote to case study</td><td>Workshop</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Claim 3 — Cross-architecture generalization.</strong> Run Alg. 1+2+3 on M3-Agent, WorldMM (InternVL), MMA (LLaVA), 50 QA each. Target: Δ Acc within ±3pp across architectures.</p>
+    </div>
+  </div>
+
+  <!-- PHASE 4 -->
+  <div class="phase">
+    <div class="phase-num">4</div>
+    <div>
+      <div class="phase-date">5/19–6/03 · 13 GPU-h · Top-venue hardening</div>
+      <h4>Hardening Pack — Five Pillars</h4>
+      <table>
+        <thead><tr><th>Pillar</th><th>What</th><th>Cost</th><th>Reviewer impact</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>A</strong></td>
+            <td>Memory poisoning detection. 4 adversarial types (wrong caption, noisy audio, frame swap, entity swap); detection signal = ψ across-modality inconsistency + φ outlier; AUROC target ≥ 0.85.</td>
+            <td>3 GPU-h, 2 d</td>
+            <td><span class="badge">5/5</span></td>
+          </tr>
+          <tr>
+            <td><strong>B</strong></td>
+            <td>Scale to LongVideoBench, K = 8 regime (300 QA subset). Turns sample-complexity wedge from table into figure with real wall-clock numbers vs flat MM-SHAP.</td>
+            <td>10 GPU-h, 3 d</td>
+            <td><span class="badge teal">4/5</span></td>
+          </tr>
+          <tr>
+            <td><strong>C</strong></td>
+            <td>Matching information-theoretic lower bound for Prop 2. Upgrades "we have a bound" → "we have the bound".</td>
+            <td>0 GPU-h, 3 d</td>
+            <td><span class="badge teal">4/5</span></td>
+          </tr>
+          <tr>
+            <td><strong>D</strong></td>
+            <td>Failure-mode taxonomy via unsupervised clustering of (φ, ψ) on Phase 2 failure cases. Expected discovery: vision-dominated / audio-dominated / caption-misleading / balanced confusion.</td>
+            <td>0 GPU-h, 1 d</td>
+            <td><span class="badge muted">2/5</span></td>
+          </tr>
+          <tr>
+            <td><strong>E</strong></td>
+            <td>Human study. 20 internal annotators × 20 failed traces. Half with attribution overlay, half without. Hypothesis: diagnosis accuracy ↑ 20pp, time-to-diagnosis ↓ 40%, p &lt; 0.01.</td>
+            <td>0 GPU-h, 7 d</td>
+            <td><span class="badge">5/5</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3>3.5 Risk &amp; backup <span class="cn">风险与备选</span></h3>
+
+  <div class="card dark">
+    <div class="label">If main track fails</div>
+    <p><strong>Trigger 1 (Phase 1):</strong> variance &gt; 3× bound or conservation residual consistently &gt; 10% → pivot to backup direction: <em>Cross-Modal Causal Mediation for Write-Policy</em>. Uses Pearl-style do-calculus on memory write decisions; the topic stays on the modality-credit main line but the math tool changes from Shapley/Owen to causal mediation.</p>
+    <p><strong>Trigger 2 (Phase 3):</strong> Claim 2 Δ Acc &lt; 5pp → demote modality-pruned retrieval from must-accept hook to "actionability case study"; paper still publishable on Claims 1 + 1.5 + 1.6 + Phase 4, targeted at ICLR workshop or NeurIPS workshop.</p>
+    <p><strong>Trigger 3 (Phase 3):</strong> Claim 3 fails (only M3-Agent works) → reframe as "M3-Agent case study"; venue tier drops one notch but submission remains intact.</p>
+  </div>
+
+  <h3>3.6 Compute summary <span class="cn">算力总计</span></h3>
+
+  <table>
+    <thead><tr><th>Phase</th><th>GPU-h</th><th>Cumulative</th></tr></thead>
+    <tbody>
+      <tr><td>1 — Toy pilot</td><td>0.5</td><td>0.5</td></tr>
+      <tr><td>2 — Detection + theory</td><td>2.2</td><td>2.7</td></tr>
+      <tr><td>3 — Hook + cross-arch</td><td>4.5</td><td>7.2</td></tr>
+      <tr><td>4A — Poisoning detection</td><td>3.0</td><td>10.2</td></tr>
+      <tr><td>4B — LongVideoBench K=8</td><td>10.0</td><td>20.2</td></tr>
+      <tr><td>4C/D/E — Theory + taxonomy + human</td><td>0</td><td>20.2</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================ FOOTER ============================================ -->
+<footer>
+  <p><strong>Related documents</strong></p>
+  <ul>
+    <li><a href="multimodal_memory_credit_method_plan_repositioned.md">multimodal_memory_credit_method_plan_repositioned.md</a> — full method plan (≈ 500 lines)</li>
+    <li><a href="multimodal_memory_credit_proposal_brief.md">multimodal_memory_credit_proposal_brief.md</a> — markdown source for this brief</li>
+    <li><a href="multimodal_memory_credit_novelty_report.md">multimodal_memory_credit_novelty_report.md</a> — novelty check (Owen 1977 finding, 2026-05-11)</li>
+    <li><a href="multimodal_memory_credit_idea_report.md">multimodal_memory_credit_idea_report.md</a> — upstream idea report from /idea-creator</li>
+  </ul>
+  <p style="margin-top:32px">Design: <em>Claude</em> from <a href="https://github.com/voltagent/awesome-design-md">voltagent/awesome-design-md</a>. Generated 2026-05-12.</p>
+</footer>
+
+</div>
+</body>
+</html>

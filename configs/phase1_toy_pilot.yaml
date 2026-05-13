@@ -1,0 +1,39 @@
+# Phase 1 — Toy pilot config
+# 30 QA from M3-Bench, K=4, budget B=500, Qwen-VL-7B, exact-match verifier.
+
+defaults:
+  - _self_
+
+seed: 42
+
+generator:
+  _target_: modality_credit.generators.qwen_vl.QwenVLGenerator
+  model_path: Qwen/Qwen2.5-VL-7B-Instruct
+  device: cuda
+
+verifier:
+  _target_: modality_credit.verifiers.exact_match.ExactMatchVerifier
+  kind: exact_match
+
+masker:
+  _target_: modality_credit.masking.redaction.RedactionMasker
+  strategy: redaction
+
+estimator:
+  _target_: modality_credit.estimator.owen.OwenEstimator
+  top_n_inner: 2
+  seed_attention: false
+  seed: 42
+
+data:
+  name: m3_bench
+  split: val
+  K: 4
+  n: 30
+
+phase:
+  phase: phase1
+  budget_B: 500
+  tau_grid: []        # not used in Phase 1
+  output_dir: results/phase1_pilot
+  wandb_project: modality_credit
