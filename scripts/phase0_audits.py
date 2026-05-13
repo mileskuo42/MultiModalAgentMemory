@@ -21,7 +21,7 @@ from modality_credit.audits.modality_leakage import ModalityLeakageAudit
 from modality_credit.audits.positional_invariance import PositionalInvarianceAudit
 from modality_credit.audits.u_empty_baseline import UEmptyBaselineAudit
 from modality_credit.caching import CachedUtility
-from modality_credit.data.synthetic import render_text_image
+from modality_credit.data.synthetic import build_rotating_modality_dataset, render_text_image
 from modality_credit.generators.qwen_vl import QwenVLGenerator
 from modality_credit.masking.redaction import RedactionMasker
 from modality_credit.types import MemoryItem, QueryInstance
@@ -29,53 +29,10 @@ from modality_credit.utility import StandardUtility
 from modality_credit.verifiers.exact_match import ExactMatchVerifier
 
 
-def build_audit_dataset(n: int, K: int) -> list[QueryInstance]:
-    """Build n samples, each with all 4 modalities. For each sample we rotate
-    which modality is the unique carrier of the answer (forces audits to see
-    every modality contribute on at least some sample)."""
-    sample_specs = [
-        ("4815", "What is the code?", "4815"),
-        ("Buster", "What is the dog's name?", "Buster"),
-        ("9:30 AM", "When is the meeting?", "9:30 AM"),
-        ("dragonfly", "What is the keyword?", "dragonfly"),
-        ("Wednesday", "What day?", "Wednesday"),
-        ("$12500", "How much?", "$12500"),
-    ]
-    decisive_modalities = ["vision", "text", "audio", "scene"]
-    out = []
-    for i in range(n):
-        fact, q, gold = sample_specs[i % len(sample_specs)]
-        decisive_mod = decisive_modalities[i % len(decisive_modalities)]
-        decisive_k = i % K
-        mem = []
-        for k in range(K):
-            modalities = {
-                "vision": render_text_image("DISTRACTOR"),
-                "text": "caption: routine background description",
-                "audio": "audio transcript: ambient room noise",
-                "scene": "scene: office, midday",
-            }
-            if k == decisive_k:
-                # Place the fact ONLY in decisive_mod for this item
-                if decisive_mod == "vision":
-                    modalities["vision"] = render_text_image(fact)
-                elif decisive_mod == "text":
-                    modalities["text"] = f"caption: the answer is {fact}"
-                elif decisive_mod == "audio":
-                    modalities["audio"] = f"audio transcript: the answer is {fact}"
-                elif decisive_mod == "scene":
-                    modalities["scene"] = f"scene: the answer is {fact}"
-            mem.append(MemoryItem(
-                item_id=f"audit_{i}_ep_{k}",
-                modalities=modalities,
-                metadata={"decisive": k == decisive_k, "decisive_mod": decisive_mod},
-            ))
-        out.append(QueryInstance(
-            instance_id=f"audit_{i}_{decisive_mod}",
-            query=q, memory=mem, gold_answer=fact,
-            metadata={"decisive_modality": decisive_mod},
-        ))
-    return out
+# build_audit_dataset is provided by modality_credit.data.synthetic
+# as build_rotating_modality_dataset; alias here for backward-compat with the
+# pre-promotion runner.
+build_audit_dataset = build_rotating_modality_dataset
 
 
 def main(n: int, K: int, audit_filter: str, out_dir: Path):

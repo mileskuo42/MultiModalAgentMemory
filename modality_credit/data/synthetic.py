@@ -42,6 +42,62 @@ def render_text_image(text: str, size: tuple[int, int] = (448, 224),
     return img
 
 
+def build_rotating_modality_dataset(n: int, K: int) -> list[QueryInstance]:
+    """Build n samples with all 4 modalities; decisive modality rotates across
+    {vision, text, audio, scene} so attribution audits / pilots see every
+    modality act as the decisive one on some subset of samples.
+
+    Vision-decisive samples have the fact rendered into the image; other-modality-
+    decisive samples have distractor images.
+    """
+    sample_specs = [
+        ("4815", "What is the code?", "4815"),
+        ("Buster", "What is the dog's name?", "Buster"),
+        ("9:30 AM", "When is the meeting?", "9:30 AM"),
+        ("dragonfly", "What is the keyword?", "dragonfly"),
+        ("Wednesday", "What day?", "Wednesday"),
+        ("$12500", "How much?", "$12500"),
+        ("FedEx", "Which carrier?", "FedEx"),
+        ("April 12", "When is Alice's birthday?", "April 12"),
+        ("422 Elm", "What address?", "422 Elm"),
+        ("8 hours", "How long?", "8 hours"),
+    ]
+    decisive_modalities = ["vision", "text", "audio", "scene"]
+    out: list[QueryInstance] = []
+    for i in range(n):
+        fact, q, gold = sample_specs[i % len(sample_specs)]
+        decisive_mod = decisive_modalities[i % len(decisive_modalities)]
+        decisive_k = i % K
+        mem: list[MemoryItem] = []
+        for k in range(K):
+            modalities: dict[Modality, object] = {
+                "vision": render_text_image("DISTRACTOR"),
+                "text": "caption: routine background description",
+                "audio": "audio transcript: ambient room noise",
+                "scene": "scene: office, midday",
+            }
+            if k == decisive_k:
+                if decisive_mod == "vision":
+                    modalities["vision"] = render_text_image(fact)
+                elif decisive_mod == "text":
+                    modalities["text"] = f"caption: the answer is {fact}"
+                elif decisive_mod == "audio":
+                    modalities["audio"] = f"audio transcript: the answer is {fact}"
+                elif decisive_mod == "scene":
+                    modalities["scene"] = f"scene: the answer is {fact}"
+            mem.append(MemoryItem(
+                item_id=f"rot_{i}_ep_{k}",
+                modalities=modalities,
+                metadata={"decisive": k == decisive_k, "decisive_mod": decisive_mod},
+            ))
+        out.append(QueryInstance(
+            instance_id=f"rot_{i}_{decisive_mod}",
+            query=q, memory=mem, gold_answer=fact,
+            metadata={"decisive_modality": decisive_mod},
+        ))
+    return out
+
+
 class SyntheticDataset(BaseDataset):
     """K × L_k synthetic QA with injected decisive modality."""
 
