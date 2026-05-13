@@ -38,11 +38,35 @@ from modality_credit.verifiers.exact_match import ExactMatchVerifier
 
 
 def build_redundancy_sample(idx: int, K: int, K_redundant: int,
-                            fact: str, query: str) -> QueryInstance:
-    """K items; item 0 has the fact in K_redundant of its 4 modalities."""
-    # Order: text, audio, scene, vision (4 modalities)
+                            fact: str, query: str,
+                            use_neutral_fillers: bool = True) -> QueryInstance:
+    """K items; item 0 has the fact in K_redundant of its 4 modalities.
+
+    `use_neutral_fillers=True` (default): non-redundant modalities of the
+    decisive item are filled with explicit "no content" placeholders rather
+    than distractor content like "UNRELATED" — keeps the framework from
+    attributing negative ψ to adversarial fillers.
+    """
     redundant_mods = ["text", "audio", "scene", "vision"][:K_redundant]
     nonredundant_mods = ["text", "audio", "scene", "vision"][K_redundant:]
+
+    if use_neutral_fillers:
+        FILL = {
+            "vision": render_text_image(""),  # blank white image
+            "text": "(no caption)",
+            "audio": "(no audio)",
+            "scene": "(no scene info)",
+        }
+        DISTRACTOR_VISION_TEXT = ""  # also blank for distractor items
+    else:
+        FILL = {
+            "vision": render_text_image("UNRELATED"),
+            "text": "caption: nothing special here",
+            "audio": "audio: ambient sounds",
+            "scene": "scene: empty room",
+        }
+        DISTRACTOR_VISION_TEXT = "DISTRACTOR"
+
     mem = []
     for k in range(K):
         modalities = {}
@@ -57,19 +81,22 @@ def build_redundancy_sample(idx: int, K: int, K_redundant: int,
                 elif m == "scene":
                     modalities["scene"] = f"scene: the answer is {fact}"
             for m in nonredundant_mods:
-                if m == "vision":
-                    modalities["vision"] = render_text_image("UNRELATED")
-                elif m == "text":
-                    modalities["text"] = "caption: nothing special here"
-                elif m == "audio":
-                    modalities["audio"] = "audio: ambient sounds"
-                elif m == "scene":
-                    modalities["scene"] = "scene: empty room"
-        else:  # distractor item
-            modalities["vision"] = render_text_image("DISTRACTOR")
-            modalities["text"] = "caption: unrelated chatter"
-            modalities["audio"] = "audio: ambient noise"
-            modalities["scene"] = "scene: hallway, afternoon"
+                modalities[m] = FILL[m]
+        else:  # distractor item: also use neutral or distractor variant per flag
+            if use_neutral_fillers:
+                modalities = {
+                    "vision": render_text_image(""),
+                    "text": "(no caption)",
+                    "audio": "(no audio)",
+                    "scene": "(no scene info)",
+                }
+            else:
+                modalities = {
+                    "vision": render_text_image(DISTRACTOR_VISION_TEXT),
+                    "text": "caption: unrelated chatter",
+                    "audio": "audio: ambient noise",
+                    "scene": "scene: hallway, afternoon",
+                }
         mem.append(MemoryItem(
             item_id=f"red{K_redundant}_{idx}_ep_{k}",
             modalities=modalities,
@@ -94,8 +121,10 @@ def main(K: int, budget_B: int, top_n_inner: int, seed: int, out_dir: Path):
     samples = []
     for K_red in [4, 3, 2]:
         for i, (fact, q) in enumerate(facts):
-            samples.append(build_redundancy_sample(i, K=K, K_redundant=K_red,
-                                                   fact=fact, query=q))
+            samples.append(build_redundancy_sample(
+                i, K=K, K_redundant=K_red, fact=fact, query=q,
+                use_neutral_fillers=True,
+            ))
     print(f"[1/3] Built {len(samples)} samples across K_redundant ∈ {{4,3,2}}")
     for s in samples:
         print(f"      {s.instance_id}: K_red={s.metadata['K_redundant']} "
