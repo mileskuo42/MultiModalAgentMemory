@@ -47,7 +47,8 @@ class OwenEstimator(BaseEstimator):
 
         # --- Algorithm 1: closed-form allocation
         N_out, N_in_list = allocate_budget(K, L_ks, budget_B,
-                                           min_per_game=self.budget_floor)
+                                           min_per_game=self.budget_floor,
+                                           top_n_inner=self.top_n_inner)
 
         # --- Outer game: φ_k
         phi = kernel_shap_outer(utility, query_inst, N=N_out,

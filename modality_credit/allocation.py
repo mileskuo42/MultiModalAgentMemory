@@ -19,7 +19,8 @@ import numpy as np
 
 
 def allocate_budget(K: int, L_ks: list[int], B: int,
-                    min_per_game: int = 10) -> tuple[int, list[int]]:
+                    min_per_game: int = 10,
+                    top_n_inner: int | None = None) -> tuple[int, list[int]]:
     """Closed-form optimal allocation under Prop 2 variance bounds.
 
     Args:
@@ -27,21 +28,33 @@ def allocate_budget(K: int, L_ks: list[int], B: int,
         L_ks:         list of within-item player counts (length K).
         B:            total utility-query budget.
         min_per_game: floor to keep variance estimable.
+        top_n_inner:  number of items that will actually be inner-gamed.
+                      None = K (legacy: spread budget across all items).
+                      In practice, OwenEstimator only runs inner-game on the
+                      top_n by φ; the budget should reflect that, otherwise
+                      the closed-form is not at the empirical optimum.
 
     Returns:
         (N_out, N_in_list), each guaranteed to be >= min_per_game.
+        N_in_list has length K; caller selects entries by top_idx.
 
-    Invariant: sum(N_in_list) + N_out <= B + K * (min_per_game).
-               (Floor may slightly inflate; we accept this for simplicity.)
+    Invariant: N_out + top_n_inner * mean(N_in_top) ≈ B.
     """
     assert K == len(L_ks), f"K={K} but len(L_ks)={len(L_ks)}"
-    assert B >= (K + 1) * min_per_game, (
-        f"Budget B={B} too small for K={K} games at min {min_per_game} each"
+    if top_n_inner is None:
+        top_n_inner = K
+    assert 1 <= top_n_inner <= K, f"top_n_inner={top_n_inner} not in [1, K={K}]"
+    assert B >= (top_n_inner + 1) * min_per_game, (
+        f"Budget B={B} too small for {top_n_inner}+1 games at min {min_per_game} each"
     )
 
     sqrt_outer = float(np.sqrt(2 ** K))
     sqrt_inners = np.sqrt(np.array([2 ** L for L in L_ks], dtype=float))
-    Z = sqrt_outer + sqrt_inners.sum()
+    # The actual inner cost is incurred only by top_n_inner items. We don't know
+    # which items they'll be pre-allocation, so we assume the top_n_inner LARGEST
+    # √(2^{L_k}) values for the budget denominator (worst-case for non-uniform L).
+    sqrt_inners_top = np.sort(sqrt_inners)[::-1][:top_n_inner]
+    Z = sqrt_outer + sqrt_inners_top.sum()
 
     N_out = max(int(np.floor(B * sqrt_outer / Z)), min_per_game)
     N_in = [max(int(np.floor(B * s / Z)), min_per_game) for s in sqrt_inners]
