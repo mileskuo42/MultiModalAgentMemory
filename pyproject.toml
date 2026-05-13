@@ -28,7 +28,7 @@ dependencies = [
 test = ["pytest>=8.0", "pytest-cov"]
 human_study = ["streamlit>=1.36"]
 deploy = ["modal>=0.64"]
-qwen = ["qwen-vl-utils>=0.0.8"]
+qwen = ["qwen-vl-utils>=0.0.8", "torchvision>=0.18"]  # torchvision needed by Qwen2VLVideoProcessor
 
 [tool.setuptools.packages.find]
 include = ["modality_credit*"]

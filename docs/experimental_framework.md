@@ -142,11 +142,15 @@ Inner game G_in^(k): players = modalities of m_k
 ### 3.3 Algorithm 1 — 闭式采样配置
 
 ```
-Given:    K, {L_k}_{k=1..K}, total utility-query budget B
-Compute:  Z = √(2^K) + Σ_k √(2^{L_k})
+Given:    K, {L_k}_{k=1..K}, total utility-query budget B, top_n_inner
+Compute:  Z = √(2^K) + Σ_{k ∈ TopN} √(2^{L_k})
           N_out*       = floor( B · √(2^K) / Z )
-          N_in^(k)*    = floor( B · √(2^{L_k}) / Z )   for each k
+          N_in^(k)*    = floor( B · √(2^{L_k}) / Z )   for each k ∈ TopN
 ```
+
+where TopN ⊆ {1..K} has size `top_n_inner` (default 2) — only those items
+get inner-gamed, so the denominator must include only those terms.
+Initial draft used `Σ_{k=1..K} √(2^{L_k})` and under-spent budget; see issue #2.
 
 ### 3.4 Theory（Prop 2）
 

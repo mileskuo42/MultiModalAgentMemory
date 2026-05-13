@@ -263,25 +263,39 @@ The variance-ratio bound (Corollary 2c) gives:
 Var(hierarchical) / Var(flat)  ≤  (Σ_k 2^{L_k}) / 2^{Σ_k L_k}
 ```
 
-Under a fixed total query budget B = K · N_outer + Σ_k N_inner^(k), minimize total estimation variance by setting:
+Under a fixed total query budget B = N_outer + Σ_{k ∈ TopN} N_inner^(k), where **TopN ⊆ {1..K}** is the set of items selected for inner-game attribution (size `top_n_inner`, default 2), minimize total estimation variance by setting:
 
 ```
-N_outer*   ∝  √(2^K)
-N_inner^(k)* ∝  √(2^{L_k})
+N_outer*       ∝  √(2^K)
+N_inner^(k)*   ∝  √(2^{L_k})    for k ∈ TopN
 ```
+
+with normalizing constant
+
+```
+Z = √(2^K) + Σ_{k ∈ TopN} √(2^{L_k})
+```
+
+**Note on top_n_inner < K** (CPU-sanity finding, 2026-05-13, see issue #2): the Lagrangian denominator must include *only* the items that will actually be inner-gamed. Earlier draft derivations assumed all K inner games run, which leads to under-spending the budget on `top_n_inner = 2 < K` by a factor of `top_n_inner / K`. The current `modality_credit.allocation.allocate_budget` correctly takes `top_n_inner` as input.
 
 **Practical assignment** (K=4, L_k=4 uniform, B=500):
 
-| Parameter | Formula | K=4, L_k=4 | K=8, L_k=6 |
-|---|---|---|---|
-| N_outer* | B · √(2^K) / Z | ~94 | ~68 |
-| N_inner^(k)* (each) | B · √(2^{L_k}) / (K·Z) | ~51 | ~58 |
-| Total queries | B | 500 | 500 |
-| Flat token queries needed | 2^{ΣL_k} | 65,536 | ~16.7M |
+| Parameter | Formula | top_n_inner=K=4 | top_n_inner=2 (default) | K=8, L_k=6, top_n_inner=2 |
+|---|---|---|---|---|
+| Z | √(2^K) + Σ_{TopN} √(2^{L_k}) | 4 + 4·4 = 20 | 4 + 2·4 = 12 | 16 + 2·8 = 32 |
+| N_outer* | B · √(2^K) / Z | ~100 | ~167 | ~250 |
+| N_inner^(k)* (each, k ∈ TopN) | B · √(2^{L_k}) / Z | ~100 | ~167 | ~125 |
+| Total queries | B | 500 | 500 | 500 |
+| Flat token queries needed | 2^{ΣL_k} | 65,536 | 65,536 | ~16.7M |
 
-where Z is the normalizing constant. This is **Algorithm 1** — a closed-form derivation from the variance bound, not a heuristic.
+This is **Algorithm 1** — a closed-form derivation from the variance bound, not a heuristic.
 
-**What this enables**: practitioner inputs K, {L_k}, and total budget B; gets back explicit N_outer and {N_inner^(k)} assignments. No hyperparameter tuning needed.
+**Empirical validation (issue #2)**: V4 sweep at K=4, L_k=3, B=500, top_n_inner=2:
+- Alg-1 prediction (corrected): N_outer=207, N_inner=146 → total_var = 0.01367
+- Empirical optimum over allocation grid: (200, 150) → total_var = 0.01184
+- Ratio Alg-1 / empirical-min = **1.154×**, within discretization noise
+
+**What this enables**: practitioner inputs K, {L_k}, B, top_n_inner; gets back explicit N_outer and {N_inner^(k)} assignments. No hyperparameter tuning needed.
 
 ### Algorithm 2 — Owen-Value Estimator
 
