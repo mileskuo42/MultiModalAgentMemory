@@ -36,8 +36,16 @@ class Generator(Protocol):
     """
 
     def generate(self, query: str, context_str: str, *,
+                 images: list[Any] | None = None,
                  max_new_tokens: int = 128) -> str:
-        """Run one forward pass; return the decoded answer string."""
+        """Run one forward pass; return the decoded answer string.
+
+        Args:
+            images: optional list of PIL.Image objects, in the order they
+                    appear in `context_str` (referenced as [image #1 attached]
+                    etc. by the Masker). Generators without vision support
+                    must accept-and-ignore.
+        """
         ...
 
     @property
@@ -103,7 +111,16 @@ class Masker(Protocol):
     def apply(self,
               memory: list[MemoryItem],
               item_mask: ItemMask,
-              modality_masks: list[ModalityMask] | None = None) -> str:
+              modality_masks: list[ModalityMask] | None = None) -> tuple[str, list[Any]]:
+        """Build the (context_string, images) pair from masked memory.
+
+        Returns:
+            (context_str, images) where:
+            - context_str: text fed to the generator, with image references
+              like '[image #N attached]' marking insertion points.
+            - images: list of PIL.Image objects in attachment order.
+              Empty list when no vision modality is kept.
+        """
         ...
 
 

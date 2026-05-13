@@ -29,8 +29,8 @@ class StandardUtility:
                  query_inst: QueryInstance,
                  item_mask: ItemMask,
                  modality_masks: list[ModalityMask] | None = None) -> float:
-        context = self._mask.apply(query_inst.memory, item_mask, modality_masks)
-        y = self._gen.generate(query_inst.query, context)
+        context, images = self._mask.apply(query_inst.memory, item_mask, modality_masks)
+        y = self._gen.generate(query_inst.query, context, images=images or None)
         self._n_calls += 1
         return float(self._ver(y, query_inst.gold_answer))
 

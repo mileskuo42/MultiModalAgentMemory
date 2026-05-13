@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class BaseGenerator(ABC):
@@ -9,7 +10,10 @@ class BaseGenerator(ABC):
 
     @abstractmethod
     def generate(self, query: str, context_str: str, *,
+                 images: list[Any] | None = None,
                  max_new_tokens: int = 128) -> str:
+        """Generate an answer; `images` is an optional list of PIL.Image-like
+        attachments referenced by `[image #N attached]` markers in context_str."""
         ...
 
     def get_attention(self, query: str, context_str: str):

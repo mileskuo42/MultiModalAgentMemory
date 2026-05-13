@@ -31,14 +31,19 @@ class RedactionMasker(BaseMasker):
     def apply(self,
               memory: list[MemoryItem],
               item_mask: ItemMask,
-              modality_masks: list[ModalityMask] | None = None) -> str:
+              modality_masks: list[ModalityMask] | None = None) -> tuple[str, list]:
         blocks = []
+        all_images: list = []
         for k, item in enumerate(memory):
             if not item_mask[k]:
                 continue
             kept = self._kept_modalities(item, modality_masks[k] if modality_masks else None)
-            blocks.append(self._format_item(item, kept))
-        return "\n\n".join(blocks)
+            block, item_images = self._format_item_with_images(
+                item, kept, image_offset=len(all_images),
+            )
+            blocks.append(block)
+            all_images.extend(item_images)
+        return "\n\n".join(blocks), all_images
 
     def _kept_modalities(self, item: MemoryItem,
                          mask: ModalityMask | None) -> dict[Modality, object]:

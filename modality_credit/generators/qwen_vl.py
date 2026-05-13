@@ -67,11 +67,23 @@ class QwenVLGenerator(BaseGenerator):
         self._torch = torch
 
     def generate(self, query: str, context_str: str, *,
+                 images: list | None = None,
                  max_new_tokens: int = 128) -> str:
-        user_content = (
+        body_text = (
             f"Memory:\n{context_str}\n\nQuestion: {query}" if context_str
             else f"Question: {query}\n\n(no memory was provided)"
         )
+        # Build user content: prepend image blocks (one per attached image)
+        # before the text body. Qwen's processor inserts <|vision_start|>
+        # ... <|vision_end|> tokens automatically when content kind is "image".
+        # We reference attached images via "[image #N attached]" markers in the
+        # text; the model can correlate position by image-index order.
+        if images:
+            user_content = [{"type": "image", "image": img} for img in images]
+            user_content.append({"type": "text", "text": body_text})
+        else:
+            user_content = body_text
+
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
@@ -79,7 +91,20 @@ class QwenVLGenerator(BaseGenerator):
         text = self._processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True,
         )
-        inputs = self._processor(text=[text], return_tensors="pt", padding=True)
+
+        if images:
+            from qwen_vl_utils import process_vision_info
+            image_inputs, video_inputs = process_vision_info(messages)
+            inputs = self._processor(
+                text=[text],
+                images=image_inputs,
+                videos=video_inputs,
+                return_tensors="pt",
+                padding=True,
+            )
+        else:
+            inputs = self._processor(text=[text], return_tensors="pt", padding=True)
+
         device = self._model.device
         inputs = {k: v.to(device) for k, v in inputs.items()}
 
@@ -89,7 +114,6 @@ class QwenVLGenerator(BaseGenerator):
                 max_new_tokens=max_new_tokens,
                 do_sample=False,  # deterministic
             )
-        # Strip the prompt prefix.
         prompt_len = inputs["input_ids"].shape[1]
         trimmed = generated_ids[:, prompt_len:]
         out = self._processor.batch_decode(

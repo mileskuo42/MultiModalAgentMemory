@@ -25,9 +25,15 @@ class MockGenerator(BaseGenerator):
         self._n_calls = 0
 
     def generate(self, query: str, context_str: str, *,
+                 images: list | None = None,
                  max_new_tokens: int = 128) -> str:
+        # Mock generator ignores images by default. If the response_fn wants
+        # them, it can use the 3-arg signature: response_fn(query, ctx, images).
         self._n_calls += 1
-        return self._fn(query, context_str)
+        try:
+            return self._fn(query, context_str, images)  # type: ignore[call-arg]
+        except TypeError:
+            return self._fn(query, context_str)
 
     @property
     def name(self) -> str:
