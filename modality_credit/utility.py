@@ -29,12 +29,10 @@ class StandardUtility:
                  query_inst: QueryInstance,
                  item_mask: ItemMask,
                  modality_masks: list[ModalityMask] | None = None) -> float:
-        # TODO(impl): build context via masker, call generator, verify against gold
-        # 1. context = self._mask.apply(query_inst.memory, item_mask, modality_masks)
-        # 2. y = self._gen.generate(query_inst.query, context)
-        # 3. self._n_calls += 1
-        # 4. return float(self._ver(y, query_inst.gold_answer))
-        raise NotImplementedError
+        context = self._mask.apply(query_inst.memory, item_mask, modality_masks)
+        y = self._gen.generate(query_inst.query, context)
+        self._n_calls += 1
+        return float(self._ver(y, query_inst.gold_answer))
 
     @property
     def n_calls(self) -> int:

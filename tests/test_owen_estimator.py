@@ -39,10 +39,11 @@ def test_conservation_holds_approximately():
     gen = _decisive_generator()
     util = StandardUtility(gen, ExactMatchVerifier(), RedactionMasker())
     est = OwenEstimator(top_n_inner=2, seed=42)
-    # TODO(impl): once StandardUtility.evaluate is implemented, this should pass
-    pytest.skip("Pending StandardUtility implementation")
     attr = est.estimate(util, qi, budget_B=64)
-    assert attr.conservation_residual < 0.10
+    assert attr.conservation_residual < 0.10, (
+        f"residual={attr.conservation_residual:.4f}, "
+        f"phi={attr.phi}, U_full={attr.U_full}, U_empty={attr.U_empty}"
+    )
 
 
 def test_top_idx_picks_decisive_item():
@@ -50,6 +51,5 @@ def test_top_idx_picks_decisive_item():
     gen = _decisive_generator()
     util = StandardUtility(gen, ExactMatchVerifier(), RedactionMasker())
     est = OwenEstimator(top_n_inner=1, seed=42)
-    pytest.skip("Pending StandardUtility implementation")
     attr = est.estimate(util, qi, budget_B=64)
-    assert attr.top_idx[0] == 0  # m_0 carries the decisive text
+    assert attr.top_idx[0] == 0, f"top_idx={attr.top_idx}, phi={attr.phi}"
