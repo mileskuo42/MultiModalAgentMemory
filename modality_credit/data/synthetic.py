@@ -42,13 +42,20 @@ def render_text_image(text: str, size: tuple[int, int] = (448, 224),
     return img
 
 
-def build_rotating_modality_dataset(n: int, K: int) -> list[QueryInstance]:
+def build_rotating_modality_dataset(n: int, K: int,
+                                    use_neutral_fillers: bool = False) -> list[QueryInstance]:
     """Build n samples with all 4 modalities; decisive modality rotates across
     {vision, text, audio, scene} so attribution audits / pilots see every
     modality act as the decisive one on some subset of samples.
 
     Vision-decisive samples have the fact rendered into the image; other-modality-
-    decisive samples have distractor images.
+    decisive samples have a vision image.
+
+    Args:
+        use_neutral_fillers: if True, non-decisive modalities use neutral
+          fillers (blank image, '(no caption)' etc.) instead of distractor
+          content. Verified in R11 to eliminate Qwen-VL's vision-distractor
+          fixation that suppresses textual modality extraction.
     """
     sample_specs = [
         ("4815", "What is the code?", "4815"),
@@ -63,6 +70,17 @@ def build_rotating_modality_dataset(n: int, K: int) -> list[QueryInstance]:
         ("8 hours", "How long?", "8 hours"),
     ]
     decisive_modalities = ["vision", "text", "audio", "scene"]
+    if use_neutral_fillers:
+        FILL_VISION = render_text_image("")  # blank white image
+        FILL_TEXT = "(no caption)"
+        FILL_AUDIO = "(no audio)"
+        FILL_SCENE = "(no scene info)"
+    else:
+        FILL_VISION = render_text_image("DISTRACTOR")
+        FILL_TEXT = "caption: routine background description"
+        FILL_AUDIO = "audio transcript: ambient room noise"
+        FILL_SCENE = "scene: office, midday"
+
     out: list[QueryInstance] = []
     for i in range(n):
         fact, q, gold = sample_specs[i % len(sample_specs)]
@@ -71,10 +89,10 @@ def build_rotating_modality_dataset(n: int, K: int) -> list[QueryInstance]:
         mem: list[MemoryItem] = []
         for k in range(K):
             modalities: dict[Modality, object] = {
-                "vision": render_text_image("DISTRACTOR"),
-                "text": "caption: routine background description",
-                "audio": "audio transcript: ambient room noise",
-                "scene": "scene: office, midday",
+                "vision": FILL_VISION,
+                "text": FILL_TEXT,
+                "audio": FILL_AUDIO,
+                "scene": FILL_SCENE,
             }
             if k == decisive_k:
                 if decisive_mod == "vision":

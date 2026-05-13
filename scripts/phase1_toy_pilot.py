@@ -37,8 +37,8 @@ from modality_credit.data.synthetic import build_rotating_modality_dataset as bu
 def main(n: int, K: int, budget_B: int, top_n_inner: int, seed: int, out_dir: Path):
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[1/4] Building Phase 1 dataset (n={n}, K={K})...")
-    samples = build_audit_dataset(n, K)
+    print(f"[1/4] Building Phase 1 dataset (n={n}, K={K}, neutral_fillers=True)...")
+    samples = build_audit_dataset(n, K, use_neutral_fillers=True)
     decisive_mod_dist = {}
     for s in samples:
         m = s.metadata["decisive_modality"]
