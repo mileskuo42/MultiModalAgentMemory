@@ -12,7 +12,9 @@ class ExactMatchVerifier:
         self.lower = lower
         self.strip_punct = strip_punct
 
-    def __call__(self, generated: str, gold: str) -> bool:
+    def __call__(self, generated: str, gold: str, *, query: str = "") -> bool:
+        # query is accepted for protocol uniformity (LLMJudgeVerifier uses it)
+        # but exact match ignores it.
         return self._norm(generated) == self._norm(gold)
 
     def _norm(self, s: str) -> str:

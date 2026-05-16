@@ -5,10 +5,10 @@ from modality_credit.generators.base import BaseGenerator
 
 
 SYSTEM_PROMPT = (
-    "You are a careful assistant. You will be given a set of memory items "
-    "retrieved for a user query. Answer the query using ONLY information from "
-    "the provided memory. If the memory is insufficient, respond with 'unknown'. "
-    "Keep your answer concise — a single phrase if possible."
+    "You are a careful assistant. Answer the user's question based on the "
+    "provided memory items (images and text). Give your single best answer "
+    "as a short word or phrase. Do not explain and do not refuse — always "
+    "commit to a concrete answer even if you are uncertain."
 )
 
 

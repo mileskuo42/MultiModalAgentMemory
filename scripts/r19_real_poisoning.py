@@ -38,6 +38,7 @@ from modality_credit.masking.redaction import RedactionMasker
 from modality_credit.types import MemoryItem, QueryInstance
 from modality_credit.utility import StandardUtility
 from modality_credit.verifiers.exact_match import ExactMatchVerifier
+from modality_credit.verifiers.llm_judge import LLMJudgeVerifier
 
 
 def _resize(img: Image.Image, max_dim: int = 448) -> Image.Image:
@@ -163,7 +164,8 @@ def detection_signal(attr) -> dict:
     }
 
 
-def main(n_per_class: int, K: int, budget_B: int, seed: int, out_dir: Path):
+def main(n_per_class: int, K: int, budget_B: int, seed: int, out_dir: Path,
+         use_llm_judge: bool = True):
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
 
@@ -191,8 +193,13 @@ def main(n_per_class: int, K: int, budget_B: int, seed: int, out_dir: Path):
     gen = QwenVLGenerator(model_path="Qwen/Qwen2.5-VL-7B-Instruct",
                           device="cuda", dtype=torch.bfloat16, seed=seed)
     print(f"      loaded in {time.time()-t0:.1f}s")
-    inner_util = StandardUtility(gen, ExactMatchVerifier(lower=True, strip_punct=True),
-                                 RedactionMasker())
+    if use_llm_judge:
+        verifier = LLMJudgeVerifier(judge_generator=gen)
+        print(f"      using LLMJudgeVerifier (same Qwen-VL model, text-only judging)")
+    else:
+        verifier = ExactMatchVerifier(lower=True, strip_punct=True)
+        print(f"      using ExactMatchVerifier (lower+strip_punct)")
+    inner_util = StandardUtility(gen, verifier, RedactionMasker())
     util = CachedUtility(inner_util)
 
     print(f"\n[3/5] Running Owen attribution (B={budget_B}, top_n_inner=2)...")
@@ -284,5 +291,8 @@ if __name__ == "__main__":
     ap.add_argument("--B", type=int, default=64)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", type=Path, default=Path("results/r19_real_poisoning"))
+    ap.add_argument("--judge", choices=["exact", "llm"], default="llm",
+                    help="verifier: 'exact' (R19 v1) or 'llm' (v2 default)")
     args = ap.parse_args()
-    main(args.n, args.K, args.B, args.seed, args.out)
+    main(args.n, args.K, args.B, args.seed, args.out,
+         use_llm_judge=(args.judge == "llm"))
